@@ -12,12 +12,12 @@ cd backend && npm install
 
 ### 2. Configure environment
 ```bash
-cp backend/.env.example backend/.env
+
 # Fill in your Supabase and Solana values
 ```
 
 ### 3. Run Supabase migration
-Paste `supabase/migrations/001_initial_schema.sql` into your Supabase SQL editor and run it.
+
 
 ### 4. Start the backend
 ```bash
@@ -48,10 +48,4 @@ settl/
 │   └── pages/       auth/, developer/, operator/
 └── supabase/
     └── migrations/  001_initial_schema.sql
-```
-
-## Phases
-- **Phase 1** (this) — scaffold, auth, schema, shell UI ✓
-- **Phase 2** — Anchor SDK, register_merchant, escrow init
-- **Phase 3** — deposits, 6am cron release, operator dashboard
-- **Phase 4** — webhooks, realtime, API keys, CSV export
+`
