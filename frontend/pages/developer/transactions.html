@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>SETTL — Transactions</title><link rel="stylesheet" href="/css/app.css"/></head>
+<body>
+<div id="sidebar-overlay" class="sidebar-overlay"></div>
+<div class="app-shell">
+  <nav class="sidebar" id="sidebar"></nav>
+  <div class="main-content">
+    <div class="topbar"><div class="topbar-left"><button class="menu-btn" onclick="openSidebar()">☰</button><span class="topbar-title">Transactions</span></div><span class="badge badge-info">developer</span></div>
+    <div class="page-body"><div class="card"><p style="color:var(--text-muted);">Full transactions page from Phase 2 loads here. Re-run the phase 2 script after this one to get the full implementation.</p></div></div>
+  </div>
+</div>
+<script src="/js/modules/api.js"></script><script src="/js/modules/auth.js"></script><script src="/js/modules/nav.js"></script>
+<script>if(!auth.requireAuth())throw 0; initSidebar('developer');</script>
+</body></html>

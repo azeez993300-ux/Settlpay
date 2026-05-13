@@ -1,0 +1,112 @@
+{
+  "version": "0.1.0",
+  "name": "settl",
+  "instructions": [
+    { "name": "registerMerchant",
+      "accounts": [
+        { "name": "merchant",      "isMut": true,  "isSigner": false },
+        { "name": "authority",     "isMut": true,  "isSigner": true  },
+        { "name": "systemProgram", "isMut": false, "isSigner": false }
+      ],
+      "args": [{ "name": "merchantId", "type": "string" }, { "name": "walletAddress", "type": "publicKey" }]
+    },
+    { "name": "initializeMerchantEscrow",
+      "accounts": [
+        { "name": "merchant",      "isMut": false, "isSigner": false },
+        { "name": "escrow",        "isMut": true,  "isSigner": false },
+        { "name": "vault",         "isMut": true,  "isSigner": false },
+        { "name": "auddMint",      "isMut": false, "isSigner": false },
+        { "name": "authority",     "isMut": true,  "isSigner": true  },
+        { "name": "tokenProgram",  "isMut": false, "isSigner": false },
+        { "name": "systemProgram", "isMut": false, "isSigner": false },
+        { "name": "rent",          "isMut": false, "isSigner": false }
+      ],
+      "args": [{ "name": "merchantId", "type": "string" }]
+    },
+    { "name": "requestWalletUpdate",
+      "accounts": [
+        { "name": "merchant",  "isMut": true,  "isSigner": false },
+        { "name": "authority", "isMut": false, "isSigner": true  }
+      ],
+      "args": [{ "name": "newWallet", "type": "publicKey" }]
+    },
+    { "name": "confirmWalletUpdate",
+      "accounts": [
+        { "name": "merchant",  "isMut": true,  "isSigner": false },
+        { "name": "authority", "isMut": false, "isSigner": true  }
+      ],
+      "args": []
+    },
+    { "name": "deactivateMerchant",
+      "accounts": [
+        { "name": "merchant",  "isMut": true,  "isSigner": false },
+        { "name": "authority", "isMut": false, "isSigner": true  }
+      ],
+      "args": []
+    },
+    { "name": "updateEscrowWallet",
+      "accounts": [
+        { "name": "merchant",  "isMut": false, "isSigner": false },
+        { "name": "escrow",    "isMut": true,  "isSigner": false },
+        { "name": "authority", "isMut": false, "isSigner": true  }
+      ],
+      "args": []
+    },
+    { "name": "release",
+      "accounts": [
+        { "name": "config",       "isMut": true,  "isSigner": false },
+        { "name": "merchant",     "isMut": true,  "isSigner": false },
+        { "name": "escrow",       "isMut": true,  "isSigner": false },
+        { "name": "vault",        "isMut": true,  "isSigner": false },
+        { "name": "merchantAta",  "isMut": true,  "isSigner": false },
+        { "name": "treasuryAta",  "isMut": true,  "isSigner": false },
+        { "name": "authority",    "isMut": false, "isSigner": true  },
+        { "name": "tokenProgram", "isMut": false, "isSigner": false }
+      ],
+      "args": [{ "name": "merchantId", "type": "string" }]
+    }
+  ],
+  "accounts": [
+    { "name": "MerchantAccount", "type": { "kind": "struct", "fields": [
+        { "name": "merchantId",    "type": "string" },
+        { "name": "wallet",        "type": "publicKey" },
+        { "name": "isActive",      "type": "bool" },
+        { "name": "registeredAt",  "type": "i64" },
+        { "name": "totalReleased", "type": "u64" },
+        { "name": "totalFeesPaid", "type": "u64" },
+        { "name": "authority",     "type": "publicKey" },
+        { "name": "pendingWallet", "type": { "option": "publicKey" } },
+        { "name": "walletUpdateAt","type": { "option": "i64" } },
+        { "name": "bump",          "type": "u8" }
+      ]}},
+    { "name": "EscrowAccount", "type": { "kind": "struct", "fields": [
+        { "name": "merchantId",     "type": "string" },
+        { "name": "merchantWallet", "type": "publicKey" },
+        { "name": "pendingBalance", "type": "u64" },
+        { "name": "totalPayments",  "type": "u64" },
+        { "name": "lastReleasedAt", "type": "i64" },
+        { "name": "authority",      "type": "publicKey" },
+        { "name": "bump",           "type": "u8" },
+        { "name": "vaultBump",      "type": "u8" }
+      ]}},
+    { "name": "SettlConfig", "type": { "kind": "struct", "fields": [
+        { "name": "authority",          "type": "publicKey" },
+        { "name": "treasuryWallet",     "type": "publicKey" },
+        { "name": "feeBasisPoints",     "type": "u16" },
+        { "name": "totalFeesCollected", "type": "u64" },
+        { "name": "bump",               "type": "u8" }
+      ]}}
+  ],
+  "errors": [
+    { "code": 6000, "name": "FeeTooHigh" },
+    { "code": 6001, "name": "MerchantIdTooLong" },
+    { "code": 6002, "name": "Unauthorized" },
+    { "code": 6003, "name": "NoWalletUpdatePending" },
+    { "code": 6004, "name": "WalletUpdateNotReady" },
+    { "code": 6005, "name": "ZeroAmount" },
+    { "code": 6006, "name": "ZeroBalance" },
+    { "code": 6007, "name": "MerchantMismatch" },
+    { "code": 6008, "name": "MerchantInactive" },
+    { "code": 6009, "name": "Overflow" }
+  ]
+}

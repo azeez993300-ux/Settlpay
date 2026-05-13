@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>SETTL — Payment link</title>
+  <link rel="stylesheet" href="/css/app.css"/>
+  <!-- QR code library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body>
+<div id="sidebar-overlay" class="sidebar-overlay"></div>
+<div class="app-shell">
+  <nav class="sidebar" id="sidebar"></nav>
+  <div class="main-content">
+    <div class="topbar">
+      <div class="topbar-left">
+        <button class="menu-btn" onclick="openSidebar()">☰</button>
+        <span class="topbar-title">Payment link</span>
+      </div>
+      <span class="badge badge-success">operator</span>
+    </div>
+
+    <div class="page-body">
+      <div class="card" style="max-width:520px;">
+        <div class="card-title-row"><h2>Create a payment request</h2></div>
+        <p style="color:var(--text-muted);font-size:14px;margin-bottom:18px;line-height:1.6;">
+          Generate a Solana Pay QR code. Your customer scans it with any Solana wallet (Phantom, Backpack, etc.) to pay AUDD directly into your escrow vault.
+        </p>
+
+        <div class="form-group">
+          <label class="form-label">Merchant</label>
+          <select class="form-input" id="sel-merchant">
+            <option value="">Loading…</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Amount (AUDD) <span style="color:var(--text-hint);font-weight:400;">— leave blank for open</span></label>
+          <input class="form-input" id="inp-amount" type="number" min="0.01" step="0.01" placeholder="e.g. 10.00"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Message / order reference <span style="color:var(--text-hint);font-weight:400;">— optional</span></label>
+          <input class="form-input" id="inp-msg" placeholder="Order #1234"/>
+        </div>
+        <button class="btn btn-primary btn-full" onclick="generateQR()">Generate QR code</button>
+      </div>
+
+      <!-- QR Result -->
+      <div class="card" id="qr-result" style="display:none;max-width:520px;">
+        <div class="card-title-row"><h2>Scan to pay</h2></div>
+
+        <!-- Step indicator -->
+        <div class="steps" id="steps">
+          <div class="step active" id="step1">1</div>
+          <div class="step-line" id="line1"></div>
+          <div class="step waiting" id="step2">2</div>
+          <div class="step-line" id="line2"></div>
+          <div class="step waiting" id="step3">✓</div>
+        </div>
+        <div style="font-size:13px;color:var(--text-muted);margin-bottom:16px;" id="step-label">Waiting for customer to scan…</div>
+
+        <div class="qr-wrap">
+          <div id="qr-canvas"></div>
+          <div style="text-align:center;">
+            <div style="font-size:13px;font-weight:600;" id="qr-merchant-name"></div>
+            <div style="font-size:20px;font-weight:700;color:var(--brand);margin:4px 0;" id="qr-amount-display"></div>
+            <div style="font-size:12px;color:var(--text-muted);">AUDD · Solana Devnet</div>
+          </div>
+        </div>
+
+        <div id="qr-status-area" style="margin-top:14px;">
+          <div style="display:flex;align-items:center;gap:10px;color:var(--text-muted);font-size:14px;" id="polling-indicator">
+            <div class="spinner"></div>
+            <span>Watching for payment…</span>
+          </div>
+        </div>
+
+        <div id="payment-confirmed" class="alert alert-success" style="display:none;margin-top:14px;">
+          ✓ Payment confirmed on-chain!
+          <a id="confirm-tx-link" href="#" target="_blank" style="font-size:12px;display:block;margin-top:4px;font-family:var(--font-mono);">View transaction</a>
+        </div>
+
+        <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-secondary btn-sm" onclick="copyPayUrl()">Copy Solana Pay URL</button>
+          <button class="btn btn-secondary btn-sm" onclick="newPayment()">New payment</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script src="/js/modules/api.js"></script>
+<script src="/js/modules/auth.js"></script>
+<script src="/js/modules/toast.js"></script>
+<script src="/js/modules/nav.js"></script>
+<script>
+  if (!auth.requireAuth()) throw 0;
+  initSidebar(auth.getMode());
+
+  let pollInterval = null;
+  let currentRef   = null;
+  let currentUrl   = null;
+
+  async function loadMerchants() {
+    const { merchants } = await api.merchants.list();
+    const sel = document.getElementById('sel-merchant');
+    const active = merchants.filter(m => m.is_active);
+    if (!active.length) {
+      sel.innerHTML = '<option value="">No active merchants</option>';
+      return;
+    }
+    sel.innerHTML = active.map(m => `<option value="${m.merchant_id}">${m.name||m.merchant_id}</option>`).join('');
+  }
+
+  async function generateQR() {
+    const merchantId = document.getElementById('sel-merchant').value;
+    const amountVal  = document.getElementById('inp-amount').value;
+    const message    = document.getElementById('inp-msg').value.trim();
+    if (!merchantId) { toast.error('Select a merchant'); return; }
+
+    stopPolling();
+
+    const amount = amountVal ? parseFloat(amountVal) : null;
+
+    try {
+      const session = await api.payments.session({
+        merchant_id: merchantId,
+        amount:      amount || null,
+        message:     message || null,
+      });
+
+      currentRef = session.reference;
+      currentUrl = session.url;
+
+      // Render QR
+      document.getElementById('qr-canvas').innerHTML = '';
+      new QRCode(document.getElementById('qr-canvas'), {
+        text:          session.url,
+        width:         220, height: 220,
+        colorDark:     '#111827',
+        colorLight:    '#ffffff',
+        correctLevel:  QRCode.CorrectLevel.M,
+      });
+
+      document.getElementById('qr-merchant-name').textContent  = session.label || merchantId;
+      document.getElementById('qr-amount-display').textContent = amount ? amount.toFixed(2) + ' AUDD' : 'Open amount';
+
+      document.getElementById('qr-result').style.display = '';
+      document.getElementById('payment-confirmed').style.display = 'none';
+      document.getElementById('polling-indicator').style.display = 'flex';
+      setStep(1);
+      startPolling(currentRef);
+
+    } catch (err) { toast.error(err.message); }
+  }
+
+  function startPolling(ref) {
+    stopPolling();
+    setStep(2);
+    document.getElementById('step-label').textContent = 'Customer scanning or sending payment…';
+
+    pollInterval = setInterval(async () => {
+      try {
+        const result = await api.payments.poll(ref);
+        if (result.status === 'confirmed') {
+          stopPolling();
+          setStep(3);
+          document.getElementById('step-label').textContent = 'Payment received!';
+          document.getElementById('polling-indicator').style.display = 'none';
+          const conf = document.getElementById('payment-confirmed');
+          conf.style.display = '';
+          const link = document.getElementById('confirm-tx-link');
+          link.href        = `https://explorer.solana.com/tx/${result.tx}?cluster=devnet`;
+          link.textContent = result.tx?.slice(0,20) + '…';
+          toast.success('Payment confirmed!');
+        } else if (result.status === 'failed') {
+          stopPolling();
+          toast.error('Payment validation failed: ' + (result.error || 'unknown'));
+        }
+      } catch {}
+    }, 1000);
+  }
+
+  function stopPolling() {
+    if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+  }
+
+  function setStep(n) {
+    [1,2,3].forEach(i => {
+      const s = document.getElementById('step'+i);
+      const l = document.getElementById('line'+i);
+      s.className = `step ${i<n?'done':i===n?'active':'waiting'}`;
+      if (l) l.className = `step-line ${i<n?'done':''}`;
+    });
+  }
+
+  function copyPayUrl() {
+    if (!currentUrl) return;
+    navigator.clipboard.writeText(currentUrl).then(() => toast.success('Solana Pay URL copied!'));
+  }
+
+  function newPayment() {
+    stopPolling();
+    document.getElementById('qr-result').style.display = 'none';
+    document.getElementById('inp-amount').value = '';
+    document.getElementById('inp-msg').value    = '';
+  }
+
+  loadMerchants();
+</script>
+</body>
+</html>

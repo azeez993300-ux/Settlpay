@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>SETTL — Cron monitor</title>
+  <link rel="stylesheet" href="/css/app.css"/>
+</head>
+<body>
+<div id="sidebar-overlay" class="sidebar-overlay"></div>
+<div class="app-shell">
+  <nav class="sidebar" id="sidebar"></nav>
+  <div class="main-content">
+    <div class="topbar">
+      <div class="topbar-left"><button class="menu-btn" onclick="openSidebar()">☰</button><span class="topbar-title">Cron monitor</span></div>
+      <span class="badge badge-info">developer</span>
+    </div>
+    <div class="page-body">
+
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+          <div><div class="card-title">Next scheduled release</div><div class="card-value" id="next-cd">—</div></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-secondary" id="btn-all" onclick="triggerAll()">▶ Release all now</button>
+            <select class="form-input" id="sel-m" style="width:auto;min-width:160px;"></select>
+            <button class="btn btn-secondary" onclick="triggerOne()">Run one</button>
+          </div>
+        </div>
+        <div id="trig-status" style="font-size:13px;color:var(--text-muted);margin-top:10px;display:none;"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title-row"><h2>Run history</h2><button class="btn btn-secondary btn-sm" onclick="loadLogs()">Refresh</button></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Started</th><th>By</th><th>Status</th><th>Released</th><th>Skipped</th><th>Failed</th><th>Summary</th></tr></thead>
+            <tbody id="cron-tbody"><tr><td colspan="7" style="text-align:center;padding:28px;color:var(--text-hint);">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script src="/js/modules/api.js"></script>
+<script src="/js/modules/auth.js"></script>
+<script src="/js/modules/toast.js"></script>
+<script src="/js/modules/nav.js"></script>
+<script>
+  if (!auth.requireAuth()) throw 0;
+  initSidebar('developer');
+
+  function nextRelease() {
+    const now=new Date(),next=new Date(); next.setUTCHours(6,0,0,0);
+    if(next<=now) next.setUTCDate(next.getUTCDate()+1);
+    const d=next-now,h=Math.floor(d/3600000),m=Math.floor((d%3600000)/60000);
+    return `${h}h ${m}m`;
+  }
+
+  async function init() {
+    document.getElementById('next-cd').textContent = nextRelease();
+    const { merchants } = await api.merchants.list().catch(()=>({merchants:[]}));
+    const sel = document.getElementById('sel-m');
+    sel.innerHTML = '<option value="">Select merchant…</option>' +
+      merchants.filter(m=>m.is_active).map(m=>`<option value="${m.merchant_id}">${m.merchant_id}</option>`).join('');
+    loadLogs();
+    setInterval(()=>document.getElementById('next-cd').textContent=nextRelease(),60000);
+  }
+
+  async function loadLogs() {
+    const tbody = document.getElementById('cron-tbody');
+    try {
+      const { logs } = await api.release.logs();
+      if (!logs.length) {
+        tbody.innerHTML=`<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--text-hint);">No runs yet — trigger one above or wait for 6am UTC</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = logs.map(l=>`<tr>
+        <td style="font-size:12px;">${new Date(l.started_at).toLocaleString()}</td>
+        <td><span class="badge ${l.triggered_by==='cron'?'badge-info':'badge-pending'}">${l.triggered_by}</span></td>
+        <td><span class="badge ${l.status==='success'?'badge-success':l.status==='failed'?'badge-error':l.status==='running'?'badge-pending':'badge-info'}">${l.status}</span></td>
+        <td style="color:var(--teal);font-weight:600;">${l.released??'—'}</td>
+        <td style="color:var(--text-muted);">${l.skipped??'—'}</td>
+        <td style="color:${l.failed>0?'var(--coral)':'var(--text-muted)'};">${l.failed??'—'}</td>
+        <td style="font-size:12px;color:var(--text-muted);">${l.summary||'—'}</td>
+      </tr>`).join('');
+    } catch(err) { toast.error(err.message); }
+  }
+
+  async function triggerAll() {
+    const btn=document.getElementById('btn-all');
+    const st=document.getElementById('trig-status');
+    btn.disabled=true; btn.textContent='⏳ Running…';
+    st.textContent='Sending release to Devnet for all merchants…'; st.style.display='';
+    try {
+      const r=await api.release.all();
+      st.textContent=`Done — ${r.released} released, ${r.skipped} skipped, ${r.failed} failed`;
+      toast.success('Release complete');
+      loadLogs();
+    } catch(err) { st.textContent='Error: '+err.message; toast.error(err.message); }
+    finally { btn.disabled=false; btn.textContent='▶ Release all now'; }
+  }
+
+  async function triggerOne() {
+    const id=document.getElementById('sel-m').value;
+    if (!id) { toast.error('Select a merchant'); return; }
+    const st=document.getElementById('trig-status');
+    st.textContent=`Releasing ${id}…`; st.style.display='';
+    try {
+      const r=await api.release.one(id);
+      st.textContent=r.skipped?`Skipped — ${r.reason}`:`Released ${id} successfully`;
+      toast.success(r.skipped?'Skipped: '+r.reason:'Release successful!');
+      loadLogs();
+    } catch(err) { st.textContent='Error: '+err.message; toast.error(err.message); }
+  }
+
+  init();
+</script>
+</body>
+</html>

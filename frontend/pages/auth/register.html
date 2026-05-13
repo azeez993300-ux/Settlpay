@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>SETTL — Register</title>
+  <link rel="stylesheet" href="../../css/app.css"/>
+</head>
+<body>
+<div class="auth-wrap">
+  <div class="auth-card">
+    <div class="auth-logo">SETTL</div>
+    <div class="auth-sub">Create your account</div>
+
+    <div class="form-group">
+      <label class="form-label">Full name</label>
+      <input class="form-input" id="full-name" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Email</label>
+      <input class="form-input" id="email" type="email" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Password</label>
+      <input class="form-input" id="password" type="password" />
+    </div>
+    <button class="btn btn-primary" style="width:100%;" onclick="doRegister()">Create account</button>
+    <p style="text-align:center;margin-top:16px;">
+      Already have an account? <a href="login.html">Sign in</a>
+    </p>
+  </div>
+</div>
+<script src="../../js/modules/api.js"></script>
+<script src="../../js/modules/auth.js"></script>
+<script src="../../js/modules/toast.js"></script>
+<script>
+  if (auth.isLoggedIn()) window.location.href = '/pages/dashboard.html';
+
+  async function doRegister() {
+    const fullName = document.getElementById('full-name').value;
+    const email = document.getElementById('email').value;
+    const password = document.getElementById('password').value;
+    
+    if (!email || !password) {
+      toast.error('Email and password required');
+      return;
+    }
+    
+    if (password.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
+    }
+    
+    try {
+      await api.auth.register(email, password, fullName);
+      toast.success('Account created! Please sign in.');
+      setTimeout(() => {
+        window.location.href = '/pages/auth/login.html';
+      }, 1500);
+    } catch(err) {
+      toast.error(err.message);
+    }
+  }
+</script>
+</body>
+</html>

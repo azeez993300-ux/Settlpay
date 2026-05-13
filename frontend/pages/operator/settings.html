@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>SETTL — Settings</title><link rel="stylesheet" href="/css/app.css"/></head>
+<body>
+<div id="sidebar-overlay" class="sidebar-overlay"></div>
+<div class="app-shell">
+  <nav class="sidebar" id="sidebar"></nav>
+  <div class="main-content">
+    <div class="topbar"><div class="topbar-left"><button class="menu-btn" onclick="openSidebar()">☰</button><span class="topbar-title">Settings</span></div></div>
+    <div class="page-body">
+      <div class="card" style="max-width:480px;">
+        <div class="card-title-row"><h2>Profile</h2></div>
+        <div class="form-group"><label class="form-label">Full name</label><input class="form-input" id="f-name"/></div>
+        <div class="form-group"><label class="form-label">Email</label><input class="form-input" id="f-email" readonly style="background:var(--bg);color:var(--text-muted);"/></div>
+        <div class="form-group"><label class="form-label">Role</label><input class="form-input" id="f-role" readonly style="background:var(--bg);color:var(--text-muted);"/></div>
+        <div id="save-ok" class="alert alert-success" style="display:none;">Saved!</div>
+        <button class="btn btn-primary" onclick="saveProfile()">Save changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="/js/modules/api.js"></script><script src="/js/modules/auth.js"></script><script src="/js/modules/toast.js"></script><script src="/js/modules/nav.js"></script>
+<script>
+  if (!auth.requireAuth()) throw 0;
+  initSidebar('operator');
+  const u = auth.getUser();
+  document.getElementById('f-name').value  = u?.full_name||'';
+  document.getElementById('f-email').value = u?.email||'';
+  document.getElementById('f-role').value  = u?.role||'';
+  async function saveProfile() {
+    try {
+      const { user } = await api.auth.profile({ full_name: document.getElementById('f-name').value });
+      auth.save(auth.getToken(), user);
+      document.getElementById('save-ok').style.display=''; setTimeout(()=>document.getElementById('save-ok').style.display='none',2500);
+    } catch(err) { toast.error(err.message); }
+  }
+</script>
+</body></html>
